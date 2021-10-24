@@ -54,6 +54,9 @@ class Connector():
         return self.c.fetchall()[0]
     
     def add(self, table, values):
+        # raw values as a list:
+        # ['john','doe']
+        
         sql = f"INSERT INTO {table} VALUES ("
         for value in values:
             sql+= f"'{value}',"
@@ -62,6 +65,12 @@ class Connector():
         self.conn.commit()
         
     def update_on(self, table, oid, values):
+        # values here is a dictionary,
+        # for example with the planters table:
+        # { 'fname':'John', 'lname':'Doe' }
+        # or the seedlots table:
+        # { 'code':SX001, 'spec':'Spruce','price':0.15,...
+    
         sql = f"UPDATE {table} SET "
         for value_name, value in values.items():
             sql += f"{value_name} = '{value}',"
@@ -229,7 +238,7 @@ class Connector():
 # testing stuff
 if __name__ == '__main__':
     c = Connector('dayrates.db')
-    print(c.daily_report('2021-10-15'), '\n')
-    print(c.planter_report(1), '\n')
-    print(c.stats_report(), '\n')
-    print(c.foreman_report())
+#     print(c.daily_report('2021-10-15'), '\n')
+#     print(c.planter_report(1), '\n')
+#     print(c.stats_report(), '\n')
+#     print(c.foreman_report())
