@@ -48,11 +48,35 @@ class Connector():
     def get(self, table):
         self.c.execute(f"SELECT oid, * from {table}")
         return self.c.fetchall()
-    
+
+    def get_blocks(self): 
+        self.c.execute(f"SELECT DISTINCT code FROM blocks")
+        block_list = [block[0] for block in self.c.fetchall()] 
+        block_and_seeds = {}
+        for block in block_list: 
+            seed_list = []
+            self.c.execute(f"SELECT DISTINCT sid FROM blocks WHERE code = '{block}'")
+            seed_list = [seed[0] for seed in self.c.fetchall()]
+            block_and_seeds[block] = seed_list
+        return block_and_seeds
+
     def get_on(self, table, oid):
         self.c.execute(f"SELECT * from {table} WHERE oid = {oid}")
         return self.c.fetchall()[0]
-    
+
+    def get_seed_oid(self, code): 
+        self.c.execute(f"SELECT oid from seedlots WHERE code='{code}'")
+        return self.c.fetchall()[0][0]
+
+    def seed_code_exists(self, code): 
+        self.c.execute(f"SELECT * from seedlots WHERE code='{code}'")
+        return bool(self.c.fetchall())
+
+
+    def in_daily(self, key, value): 
+        self.c.execute(f"SELECT * FROM daily WHERE {key} = '{value}'")
+        return bool(self.c.fetchall())
+
     def add(self, table, values):
         # raw values as a list:
         # ['john','doe']
@@ -213,7 +237,6 @@ class Connector():
         rows = [['Date', 'Planted', 'Crew Planted', 'Gross']]
         self.c.execute('SELECT DISTINCT jour FROM daily')
         day_list = [day[0] for day in self.c.fetchall()]
-        print(day_list)
         total = 0
         crew_total = 0
         gross_total = 0
@@ -242,3 +265,6 @@ if __name__ == '__main__':
 #     print(c.planter_report(1), '\n')
 #     print(c.stats_report(), '\n')
 #     print(c.foreman_report())
+   # print(c.in_daily('pid', '1'))
+    #print(c.in_daily('pid', 'foo'))
+    print(c.get_blocks())

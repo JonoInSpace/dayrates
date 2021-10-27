@@ -58,19 +58,19 @@ class App():
     
     
     # # planter view page # #
-    pv_page = ttk.Frame(dv_book)
-    dv_book.add(pv_page, text="Planters")
+    ps_page = ttk.Frame(dv_book)
+    dv_book.add(ps_page, text="Planters")
     planter_data = c.get('planters')
     
     # tree frame
-    pv_tree_frame = ttk.Frame(pv_page,height=100)
-    pv_tree_frame.pack()
+    ps_tree_frame = ttk.Frame(ps_page,height=100)
+    ps_tree_frame.pack()
     # create scrollbar
-    p_scroll = ttk.Scrollbar(pv_tree_frame)
+    p_scroll = ttk.Scrollbar(ps_tree_frame)
     p_scroll.pack(side=tk.RIGHT, fill=tk.Y)
     # create treeview
     global p_tree
-    p_tree = ttk.Treeview(pv_tree_frame, yscrollcommand=p_scroll.set,selectmode='browse')
+    p_tree = ttk.Treeview(ps_tree_frame, yscrollcommand=p_scroll.set,selectmode='browse')
     p_tree.pack(pady=5)
     
     # scrollbar config
@@ -104,7 +104,7 @@ class App():
         p_count += 1
     
     # Planter Data Entry and Labels
-    p_data_frame = ttk.Frame(pv_page, width=300)
+    p_data_frame = ttk.Frame(ps_page, width=300)
     p_data_frame.pack()
     
     p_fname_label = ttk.Label(p_data_frame, text='First Name',anchor=tk.W)
@@ -148,10 +148,14 @@ class App():
         p_count += 1
     
     def remove_planter():
-        global p_count 
         oid = p_id.get()
-        c.delete_on('planters', oid)
+        if (c.in_daily('pid', oid)): 
+            return 
+            # error message here 
+            # 
+            # 
 
+        c.delete_on('planters', oid)
         p_tree.delete(p_tree.focus())
 
     p_edit_btn = ttk.Button(p_data_frame, text='Edit', command=edit_planter)
@@ -177,58 +181,188 @@ class App():
         p_id.config(state='disabled')
     
     p_tree.bind('<ButtonRelease-1>',select_planter)
+    
+
+
     # seedlot view page
     sv_page = ttk.Frame(dv_book)
     dv_book.add(sv_page, text="Seedlots")
     # get seed data
     seed_data = c.get('seedlots')
     # tree frame
-    sv_tree_frame = ttk.Frame(sv_page,height=100)
+    sv_tree_frame = ttk.Frame(sv_page)
     sv_tree_frame.pack()
     # create scrollbar
-    v_scroll = ttk.Scrollbar(sv_tree_frame)
-    v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    s_scroll = ttk.Scrollbar(sv_tree_frame)
+    s_scroll.pack(side=tk.RIGHT, fill=tk.Y)
     # create treeview
-    v_tree = ttk.Treeview(sv_tree_frame, yscrollcommand=v_scroll.set,selectmode='browse')
-    v_tree.pack()
+    global s_tree
+    s_tree = ttk.Treeview(sv_tree_frame, yscrollcommand=s_scroll.set,selectmode='browse')
+    s_tree.pack()
     
     # scrollbar config
-    v_scroll.config(command=v_tree.yview)
+    s_scroll.config(command=s_tree.yview)
     
     # define columns
-    v_tree['columns'] = ("code", "spec", "price","box","bndl")
+    s_tree['columns'] = ("code", "spec", "price","box","bndl")
     # format columns
-    v_tree.column("#0", width=0, stretch=tk.NO)
-    v_tree.column("code", anchor=tk.W, width=50)
-    v_tree.column("spec",anchor=tk.W, width=50)
-    v_tree.column("price", anchor=tk.CENTER, width=50)
-    v_tree.column("box", anchor=tk.CENTER, width=50)
-    v_tree.column("bndl", anchor=tk.CENTER, width=50)
+    s_tree.column("#0", width=0, stretch=tk.NO)
+    s_tree.column("code", anchor=tk.W, width=50)
+    s_tree.column("spec",anchor=tk.W, width=50)
+    s_tree.column("price", anchor=tk.CENTER, width=50)
+    s_tree.column("box", anchor=tk.CENTER, width=50)
+    s_tree.column("bndl", anchor=tk.CENTER, width=50)
     # create headings
-    v_tree.heading("#0", text="", anchor=tk.W)
-    v_tree.heading("code", text="Code", anchor=tk.W)
-    v_tree.heading("spec", text="Species", anchor=tk.W)
-    v_tree.heading("price", text="Price", anchor=tk.CENTER)
-    v_tree.heading("box", text="Box", anchor=tk.CENTER)
-    v_tree.heading("bndl", text="Bndl", anchor=tk.CENTER)
+    s_tree.heading("#0", text="", anchor=tk.W)
+    s_tree.heading("code", text="Code", anchor=tk.W)
+    s_tree.heading("spec", text="Species", anchor=tk.W)
+    s_tree.heading("price", text="Price", anchor=tk.CENTER)
+    s_tree.heading("box", text="Box", anchor=tk.CENTER)
+    s_tree.heading("bndl", text="Bndl", anchor=tk.CENTER)
     # striped row tags and colors 
-    v_tree.tag_configure('even', background='#313131')
-    v_tree.tag_configure('odd', background='#424242')
+    s_tree.tag_configure('even', background='#313131')
+    s_tree.tag_configure('odd', background='#424242')
     
-    x = 0    
+    global s_count
+    s_count = 0    
     for record in seed_data:
-        if x % 2:
+        if s_count % 2:
             TAG = 'even'
         else:
             TAG = 'odd'
-        v_tree.insert(parent='', index='end', iid=x, text='', values=(record[1],record[2],'$'+str(record[3]),record[4],record[5]),tags=(TAG,))
-        x += 1
-        
+        s_tree.insert(parent='', index='end', iid=s_count, text='', values=(record[1],record[2],'$'+str(record[3]),record[4],record[5]),tags=(TAG,))
+        s_count += 1
+
+    # frame for labels/entries/buttons 
+    s_data_frame = ttk.Frame(sv_page, width=300)
+    s_data_frame.pack()
+    # labels and entries for seedlot info 
+    s_code_label = ttk.Label(s_data_frame, text='Code')
+    s_spec_label = ttk.Label(s_data_frame, text='Species')
+    s_price_label = ttk.Label(s_data_frame, text='Price')
+    s_box_label = ttk.Label(s_data_frame, text='Box Size')
+    s_bndl_label = ttk.Label(s_data_frame, text='Bndl Size')
+    
+    global s_code
+    global s_spec
+    global s_price
+    global s_box
+    global s_bndl
+
+    s_code = ttk.Entry(s_data_frame,width=10)
+    s_spec = ttk.Entry(s_data_frame,width=10)
+    s_price = ttk.Entry(s_data_frame,width=10)
+    s_box = ttk.Entry(s_data_frame,width=10)
+    s_bndl = ttk.Entry(s_data_frame,width=10)
+
+    s_code_label.grid(row=0,column=0)
+    s_spec_label.grid(row=0,column=2)
+    s_price_label.grid(row=2,column=0)
+    s_box_label.grid(row=1,column=0)
+    s_bndl_label.grid(row=1,column=2)
+
+    s_code.grid(row=0,column=1,pady=5)
+    s_spec.grid(row=0,column=3)
+    s_price.grid(row=2,column=1,pady=5)
+    s_box.grid(row=1,column=1)
+    s_bndl.grid(row=1,column=3)
+
+    def select_seedlot(x):
+        s_code.delete(0,tk.END)
+        s_spec.delete(0,tk.END)
+        s_price.delete(0,tk.END)
+        s_box.delete(0,tk.END)
+        s_bndl.delete(0, tk.END)
+
+        selected = s_tree.focus()
+        values = s_tree.item(selected, 'values')
+
+        s_code.insert(0,values[0])
+        s_spec.insert(0,values[1])
+        s_price.insert(0,values[2][1:])
+        s_box.insert(0,values[3])
+        s_bndl.insert(0,values[4])
+
+
+    s_tree.bind('<ButtonRelease-1>',select_seedlot)
+    
+
+    # add, edit, remove seed buttons 
+    def edit_seed(): 
+        values = { 
+        'code':s_code.get(),
+        'species':s_spec.get(),
+        'price':s_price.get(),
+        'box_size':s_box.get(),
+        'bndl_size':s_bndl.get()
+        }
+
+        if (values['box_size'] % values['bndl_size']): 
+           return 
+           # maybe make an error message here!!!
+           # 
+           # 
+           # 
+
+        oid = c.get_seed_oid(values['code'])
+        c.update_on('seedlots', oid, values)
+        selected = s_tree.focus()
+        s_tree.item(selected, text='', values=(values['code'],values['species'],'$' + str(values['price']),values['box_size'],values['bndl_size']))
+
+    def add_seed():
+        global s_count 
+
+        code = s_code.get()
+        spec = s_spec.get() 
+        price = s_price.get() 
+        box = s_box.get() 
+        bndl = s_bndl.get()
+        if (c.seed_code_exists(code) or (box%bndl)):
+            return
+            # make an error message here!!! 
+            # 
+            # 
+            # 
+
+        c.add('seedlots', [code, spec, price, box, bndl])
+        if s_count % 2:
+            TAG = 'even'
+        else:
+            TAG = 'odd'
+        s_tree.insert(parent='', index='end', iid=s_count, text='', values=(code, spec, '$' + price, box, bndl),tags=(TAG,))
+        s_count += 1
+
+
+    def remove_seed(): 
+        code = s_code.get() 
+        if c.in_daily('sid', code):
+            return
+            # error message
+            # 
+            #
+
+        c.delete_on('seedlots', c.get_seed_oid(code))
+        s_tree.delete(s_tree.focus())
+
+
+    # seed button frame 
+    s_btn_frame = ttk.Frame(sv_page)
+    s_btn_frame.pack()
+
+    s_edit_btn = ttk.Button(s_btn_frame, text='Edit', command=edit_seed)
+    s_add_btn = ttk.Button(s_btn_frame, text='Add', command=add_seed)
+    s_del_btn = ttk.Button(s_btn_frame,text='Remove',command=remove_seed,style='Accent.TButton')
+
+    s_edit_btn.grid(row=0, column=0, padx=5)
+    s_add_btn.grid(row=0, column=1, padx=5)
+    s_del_btn.grid(row=0,column=2, padx=5) 
+
     # blocks view page
     blocks_page = ttk.Frame(dv_book)
     dv_book.add(blocks_page, text="Blocks")
     # get block data
     block_data = c.get('blocks')
+    print(block_data)
     
     dv_book.pack(expand=True, fill='both', padx=5, pady=5)
     
