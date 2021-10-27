@@ -50,6 +50,15 @@ class Connector():
         return self.c.fetchall()
 
     def get_blocks(self): 
+        """
+        returns a dictionary of block codes and the corresponding seeds
+        { block1: [seed1, seed2, seed3],
+          block2: [seed1, seed4],
+          ...
+          blockM: [*seeds]
+          }
+        """
+
         self.c.execute(f"SELECT DISTINCT code FROM blocks")
         block_list = [block[0] for block in self.c.fetchall()] 
         block_and_seeds = {}
@@ -87,6 +96,11 @@ class Connector():
         sql = sql[:-1] + ")"
         self.c.execute(sql)
         self.conn.commit()
+
+    def next_pid(self): 
+        self.c.execute('SELECT MAX(oid) FROM planters')
+        self.conn.commit() 
+        return self.c.fetchall()[0][0]
         
     def update_on(self, table, oid, values):
         # values here is a dictionary,
@@ -106,10 +120,14 @@ class Connector():
         self.c.execute(f"DELETE from {table}")
         self.conn.commit()
     
-    def delete_on(self, table, oid):
-        self.c.execute(f"DELETE from {table} WHERE oid={oid}")
+    def delete_on(self, table, key, keyword='code'):
+        self.c.execute(f"DELETE from {table} WHERE {keyword}='{key}'")
         self.conn.commit()
     
+    def remove_seed_from_block(self, block, sid): 
+        self.c.execute(f"DELETE FROM blocks WHERE code='{block}' AND sid = '{sid}'")
+        self.conn.commit() 
+
     def list_(self, key, day):
         self.c.execute(f"SELECT distinct {key} FROM daily WHERE jour ='{day}'")
         _list = [val[0] for val in self.c.fetchall()]
@@ -267,4 +285,7 @@ if __name__ == '__main__':
 #     print(c.foreman_report())
    # print(c.in_daily('pid', '1'))
     #print(c.in_daily('pid', 'foo'))
+    
+    print(c.get_blocks())
+    c.delete_on('blocks', 'block3')
     print(c.get_blocks())
