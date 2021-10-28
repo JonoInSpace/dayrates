@@ -132,6 +132,14 @@ class Connector():
         self.c.execute(f"SELECT distinct {key} FROM daily WHERE jour ='{day}'")
         _list = [val[0] for val in self.c.fetchall()]
         return _list
+
+    def day_list(self): 
+        self.c.execute(f"SELECT DISTINCT jour FROM daily ORDER BY jour DESC")
+        return [jour[0] for jour in self.c.fetchall()]
+
+    def planter_list(self): 
+        self.c.execute(f"SELECT oid,lname FROM planters")
+        return [str(planter[0]) + " " + planter[1] for planter in self.c.fetchall()]
     
     def daily_report(self, day, foreman=False):
         """
@@ -209,7 +217,7 @@ class Connector():
             for entry in daily_data:
                 daily_total += entry[0]
                 daily_gross += entry[1]
-            rows.append( [day, daily_total, daily_gross] )
+            rows.append( [day, daily_total, round(daily_gross,2)] )
         planted = [row[1] for row in rows]
         grossed = [row[2] for row in rows]
         total = sum(planted)
@@ -286,6 +294,10 @@ if __name__ == '__main__':
    # print(c.in_daily('pid', '1'))
     #print(c.in_daily('pid', 'foo'))
     
-    print(c.get_blocks())
-    c.delete_on('blocks', 'block3')
-    print(c.get_blocks())
+ #   print(c.get_blocks())
+ #   c.delete_on('blocks', 'block3')
+ #   print(c.get_blocks())
+#    days=['2021-10-13', '2021-10-14','2021-10-15']
+ #   for day in days: 
+#        print(c.daily_report(day))
+    print(c.planter_list())

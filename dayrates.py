@@ -21,6 +21,7 @@ class App():
     style.configure('Treeview', font=('consolas',10))
     style.configure('Treeview.Heading', font=('consolas',10))
     style.configure('TButton', font=('consolas',10))
+    style.configure('TMenubutton', font=('consolas',10))
     style.configure('TLabel', font=('consolas',10))
     style.configure('TEntry', font=('consolas',10))
     style.configure('TLabelframe.Label', font=('consolas',10))
@@ -35,26 +36,204 @@ class App():
     endofday = ttk.LabelFrame(root,text='End of Day',height=200, width=700, borderwidth=1,relief=tk.SUNKEN,padding=5)
     
     # reports Frame
-    r_book = ttk.Notebook(reports, height=400, width=300)
+    r_book = ttk.Notebook(reports, height=400)
     # daily_page reports page
     daily_page = ttk.Frame(r_book)
     r_book.add(daily_page, text="Daily")
 
+    # OptionMenu to select the day, defaulted to latest entry 
+    global day
+    day = tk.StringVar()
+    day_list = c.day_list()
+
+    global day_tree_frame
+    day_tree_frame = ttk.Frame(daily_page)
+    day_tree_frame.pack(fill=tk.X)
+    global day_scroll
+    day_scroll = ttk.Scrollbar(day_tree_frame)
+    day_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    global day_tree
+    day_tree = ttk.Treeview(day_tree_frame,yscrollcommand=day_scroll.set,selectmode='browse')
+
+    def generate_daily():
+        global day
+        # grab the data 
+        daily_data = c.daily_report(day.get())
+        # display in a treeview with scroller
+        global day_tree
+        day_tree.destroy()
+        day_tree_frame.update() 
+        
+        day_tree = ttk.Treeview(day_tree_frame,yscrollcommand=day_scroll.set,selectmode='browse')
+        day_tree.pack(pady=5)
+
+        # scrollbar config
+        day_scroll.config(command=day_tree.yview)
+        
+        # define columns
+        day_tree['columns'] = daily_data[0][0]
+        # "Planter, Seed1, Seed2, ... TOTAL, gross"
+
+        # format columns
+        day_tree.column("#0", width=0, stretch=tk.NO)
+        day_tree.column('Planter', width=100, anchor=tk.W)
+        for column in daily_data[0][0][1:]:
+            day_tree.column(column, width=60, anchor=tk.W)
+        
+        # create headings
+        day_tree.heading("#0", text="", anchor=tk.W)
+        day_tree.heading('Planter', text='Planter', anchor=tk.W)
+        for heading in daily_data[0][0][1:]:
+            day_tree.heading(heading, text=heading, anchor=tk.W)
+        # striped row tags and colors 
+        day_tree.tag_configure('even', background='#313131')
+        day_tree.tag_configure('odd', background='#424242')
+
+        daily_rows = daily_data[0][1:]
+        # all the records for the day, minus the header row
+
+        row_count = 0 
+        for row in daily_rows:
+            row[-1] = f'${row[-1]}'
+            if row_count%2: 
+                TAG = 'even'
+            else: 
+                TAG = 'odd'
+            day_tree.insert(parent='', index='end', iid=row_count, text='', values=(row),tags=(TAG,))
+            row_count+=1
+        # add the remaining data, (crew_total, commission) to the button frame beneath the tree
+        global day_btn_frame
+        day_crew_label = ttk.Label(day_btn_frame, text=f'Crew Total: {daily_data[-1][0]}')
+        day_cmsn_label = ttk.Label(day_btn_frame, text=f'Commission: ${daily_data[-1][1]}')
+        day_crew_label.grid(row=1, column=0, padx=10, pady=10)
+        day_cmsn_label.grid(row=1, column=1, padx=10)
+
+
+    # daily report button frame
+    global day_btn_frame
+    day_btn_frame = ttk.Frame(daily_page)
+    day_btn_frame.pack()
+    day_select = ttk.OptionMenu(day_btn_frame, day, day_list[0], *day_list)
+    day_select.grid(row=0, column=0,padx=10)
+    gen_day_btn = ttk.Button(day_btn_frame, text='Generate Report', command=generate_daily, style='Accent.TButton')
+    gen_day_btn.grid(row=0, column=1, padx=10,pady=10)
+
+
+
     # planter reports page
     pr_page = ttk.Frame(r_book)
     r_book.add(pr_page, text="Planter")
+    global pr_tree_frame 
+    pr_tree_frame = ttk.Frame(pr_page)
+    pr_tree_frame.pack()
+    global pr_scroll
+    pr_scroll = ttk.Scrollbar(pr_tree_frame)
+    pr_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    # build tree
+    global pr_tree
+    pr_tree = ttk.Treeview(pr_tree_frame,yscrollcommand=pr_scroll.set,selectmode='browse')
+    pr_tree.pack()
+    # variables for OptionMenu to select the planter
+    global planter
+    planter = tk.StringVar()
+    planter_list = c.planter_list()
+
+
+    # tree to display the data
+    def generate_planter():
+        global planter
+        global pr_tree
+        global pr_tree_frame
+        # gather data and assign to variables 
+        pid = planter.get().split()[0]
+        planter_data = c.planter_report(pid)
+        rows = planter_data[0]
+        total, gross = planter_data[1]
+        avg,pb,stdev = planter_data[2]
+
+        # reset the tree
+        pr_tree.destroy()
+        pr_tree_frame.update()
+        pr_tree = ttk.Treeview(pr_tree_frame,yscrollcommand=pr_scroll.set,selectmode='browse')
+        pr_tree.pack()
+        # define columns 
+        pr_tree['columns'] = ('Date','Planted','Earned')
+        pr_tree.column("#0", width=0, stretch=tk.NO)
+        pr_tree.column("Date", anchor=tk.W, width=100)
+        pr_tree.column("Planted",anchor=tk.CENTER, width=100)
+        pr_tree.column("Earned", anchor=tk.CENTER, width=100)
+        # define headings 
+        pr_tree.heading("#0", text="", anchor=tk.W)
+        pr_tree.heading("Date", text="Date", anchor=tk.W)
+        pr_tree.heading("Planted", text="Planted", anchor=tk.CENTER)
+        pr_tree.heading("Earned", text="Earned", anchor=tk.CENTER)
+        pr_tree.tag_configure('even', background='#313131')
+        pr_tree.tag_configure('odd', background='#424242')
+        # insert each row 
+        x = 0
+        for row in rows:
+            if x%2: 
+                TAG = 'even'
+            else: 
+                TAG = 'odd'
+            print(row)
+            pr_tree.insert(parent='', index='end', iid=row, text='', values=(row),tags=('even',) )
+            x+=1
+        pr_tree_frame.update()
+        # something funny happening here!!! 
+        # Labels drawing over one another
+        # 
+        # 
+        # display total gross, avg, pb, stdev in pr_btn_frame
+        total_label = ttk.Label(pr_btn_frame, text = f'Total Planted: {total}')
+        gross_label = ttk.Label(pr_btn_frame, text=f'Total Grossed: ${gross}')
+        avg_label = ttk.Label(pr_btn_frame, text=f'Average Planted: {avg}')
+        pb_label = ttk.Label(pr_btn_frame, text=f'Personal Best: {pb}')
+        stdev_label = ttk.Label(pr_btn_frame, text=f'STDEV: {stdev}')
+        total_label.grid(row=1,column=0,padx=10)
+        gross_label.grid(row=1,column=1,pady=10)
+        avg_label.grid(row=2,column=0,padx=10)
+        pb_label.grid(row=2,column=1)
+        stdev_label.grid(row=3,column=0,pady=10)
+
+        pr_btn_frame.update()
+        print(rows, total, gross, avg, pb, stdev)
+
+
+    # button to generate report, labels to display misc data
+    global pr_btn_frame 
+    pr_btn_frame = ttk.Frame(pr_page)
+    pr_btn_frame.pack()
+
+    planter_select = ttk.OptionMenu(pr_btn_frame, planter, planter_list[0], *planter_list)
+    gen_planter_btn = ttk.Button(pr_btn_frame, text='Generate Report', command=generate_planter, style='Accent.TButton')
+    planter_select.grid(row=0, column=0, padx=10, pady=10)
+    gen_planter_btn.grid(row=0, column=1, padx=10)
+
 
     #stats report page
     stats_page = ttk.Frame(r_book)
     r_book.add(stats_page, text="Stats")
+
+
+
     #foreman report page
     f_page = ttk.Frame(r_book)
     r_book.add(f_page, text="Foreman")
 
+
+
+
     r_book.pack(expand=True, fill="both", padx=5, pady=5)
     
-    # data viewing Frame
-    dv_book = ttk.Notebook(dataview, height=400, width=300)
+
+
+    # data management Frame
+    # NEEDS ERROR MESSAGING
+    # 
+    # 
+    # 
+    dv_book = ttk.Notebook(dataview)
     
     
     # # planter view page # #
@@ -104,7 +283,7 @@ class App():
         p_count += 1
     
     # Planter Data Entry and Labels
-    p_data_frame = ttk.Frame(ps_page, width=300)
+    p_data_frame = ttk.Frame(ps_page)
     p_data_frame.pack()
     
     p_fname_label = ttk.Label(p_data_frame, text='First Name',anchor=tk.W)
@@ -144,7 +323,7 @@ class App():
             TAG = 'even'
         else:
             TAG = 'odd'
-        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname,c.next_pid()),tags=(TAG,))
+        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname,c.new_pid()),tags=(TAG,))
         p_count += 1
     
     def remove_planter():
@@ -181,8 +360,6 @@ class App():
         p_id.config(state='disabled')
     
     p_tree.bind('<ButtonRelease-1>',select_planter)
-    
-
 
     # seedlot view page
     sv_page = ttk.Frame(dv_book)
@@ -299,7 +476,7 @@ class App():
 
         if (values['box_size'] % values['bndl_size']): 
            return 
-           # maybe make an error message here!!!
+           #  error message here!!!
            # 
            # 
            # 
@@ -319,7 +496,7 @@ class App():
         bndl = s_bndl.get()
         if (c.seed_code_exists(code) or (box%bndl)):
             return
-            # make an error message here!!! 
+            # error message here!!! 
             # 
             # 
             # 
@@ -509,7 +686,8 @@ class App():
 
     block_add_btn.grid(row=0,column=0,padx=5, pady=10)
     block_rem_btn.grid(row=0,column=2,padx=5)
-   
+    
+    # end of day Frame 
 
     # grid the frames to root 
     reports.grid(row=0, column=0,padx=5,pady=5)
