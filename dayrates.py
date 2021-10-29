@@ -1,11 +1,17 @@
 from connector import Connector
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import datetime
 
 class App():
     global c
     c = Connector('dayrates.db')
+    if c.new(): 
+        # add some dummy stuff to the database 
+        # FOR NOW 
+        # 
+        c.dummy()
+
     root = tk.Tk()
     root.title('Main')
     # Create a style
@@ -45,6 +51,8 @@ class App():
     global day
     day = tk.StringVar()
     day_list = c.day_list()
+    if not day_list:
+        day_list.append(datetime.datetime.now().strftime('%Y-%m-%d'))
 
     global day_tree_frame
     day_tree_frame = ttk.Frame(daily_page)
@@ -102,23 +110,30 @@ class App():
             day_tree.insert(parent='', index='end', iid=row_count, text='', values=(row),tags=(TAG,))
             row_count+=1
         # add the remaining data, (crew_total, commission) to the button frame beneath the tree
-        global day_btn_frame
-        day_crew_label = ttk.Label(day_btn_frame, text=f'Crew Total: {daily_data[-1][0]}')
-        day_cmsn_label = ttk.Label(day_btn_frame, text=f'Commission: ${daily_data[-1][1]}')
+        global day_label_frame
+        for widgets in day_label_frame.winfo_children():
+            widgets.destroy()
+        
+        day_crew_label = ttk.Label(day_label_frame, text=f'Crew Total: {daily_data[-1][0]}')
+        day_cmsn_label = ttk.Label(day_label_frame, text=f'Commission: ${daily_data[-1][1]}')
         day_crew_label.grid(row=1, column=0, padx=10, pady=10)
         day_cmsn_label.grid(row=1, column=1, padx=10)
+        day_label_frame.update()
 
 
     # daily report button frame
     global day_btn_frame
     day_btn_frame = ttk.Frame(daily_page)
     day_btn_frame.pack()
+
+    global day_label_frame
+    day_label_frame =ttk.Frame(daily_page)
+    day_label_frame.pack()
+
     day_select = ttk.OptionMenu(day_btn_frame, day, day_list[0], *day_list)
     day_select.grid(row=0, column=0,padx=10)
     gen_day_btn = ttk.Button(day_btn_frame, text='Generate Report', command=generate_daily, style='Accent.TButton')
     gen_day_btn.grid(row=0, column=1, padx=10,pady=10)
-
-
 
     # planter reports page
     pr_page = ttk.Frame(r_book)
@@ -176,34 +191,38 @@ class App():
                 TAG = 'even'
             else: 
                 TAG = 'odd'
-            print(row)
-            pr_tree.insert(parent='', index='end', iid=row, text='', values=(row),tags=('even',) )
+            pr_tree.insert(parent='', index='end', iid=row, text='', values=(row),tags=(TAG,) )
             x+=1
         pr_tree_frame.update()
-        # something funny happening here!!! 
-        # Labels drawing over one another
-        # 
-        # 
+        
+        # reset the label frame
+        global pr_label_frame 
+        for widgets in pr_label_frame.winfo_children():
+            widgets.destroy()
         # display total gross, avg, pb, stdev in pr_btn_frame
-        total_label = ttk.Label(pr_btn_frame, text = f'Total Planted: {total}')
-        gross_label = ttk.Label(pr_btn_frame, text=f'Total Grossed: ${gross}')
-        avg_label = ttk.Label(pr_btn_frame, text=f'Average Planted: {avg}')
-        pb_label = ttk.Label(pr_btn_frame, text=f'Personal Best: {pb}')
-        stdev_label = ttk.Label(pr_btn_frame, text=f'STDEV: {stdev}')
+        total_label = ttk.Label(pr_label_frame, text = f'Total Planted: {total}')
+        gross_label = ttk.Label(pr_label_frame, text=f'Total Grossed: ${gross}')
+        avg_label = ttk.Label(pr_label_frame, text=f'Average Planted: {avg}')
+        pb_label = ttk.Label(pr_label_frame, text=f'Personal Best: {pb}')
+        stdev_label = ttk.Label(pr_label_frame, text=f'STDEV: {stdev}')
         total_label.grid(row=1,column=0,padx=10)
         gross_label.grid(row=1,column=1,pady=10)
         avg_label.grid(row=2,column=0,padx=10)
         pb_label.grid(row=2,column=1)
         stdev_label.grid(row=3,column=0,pady=10)
 
-        pr_btn_frame.update()
-        print(rows, total, gross, avg, pb, stdev)
+        pr_label_frame.update()
 
 
     # button to generate report, labels to display misc data
     global pr_btn_frame 
     pr_btn_frame = ttk.Frame(pr_page)
     pr_btn_frame.pack()
+
+    global pr_label_frame
+    pr_label_frame=ttk.Frame(pr_page)
+    pr_label_frame.pack()
+
 
     planter_select = ttk.OptionMenu(pr_btn_frame, planter, planter_list[0], *planter_list)
     gen_planter_btn = ttk.Button(pr_btn_frame, text='Generate Report', command=generate_planter, style='Accent.TButton')
@@ -214,15 +233,140 @@ class App():
     #stats report page
     stats_page = ttk.Frame(r_book)
     r_book.add(stats_page, text="Stats")
+    global stats_tree
+    global stats_tree_frame
+    stats_tree_frame = ttk.Frame(stats_page)
+    stats_tree_frame.pack()
+    global stats_scroll
+    stats_scroll = ttk.Scrollbar(stats_tree_frame)
+    stats_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    # build tree
+    global stats_tree
+    stats_tree = ttk.Treeview(stats_tree_frame,yscrollcommand=stats_scroll.set,selectmode='browse')
+    stats_tree.pack()
+    
+    def generate_stats():
+        global stats_tree
+        global stats_tree_frame
+        global stats_btn_frame
+        # gather data  
+        
+        stats_data = c.stats_report()
+        rows = stats_data
 
+        # reset the tree
+        stats_tree.destroy()
+        stats_tree_frame.update()
+        stats_tree = ttk.Treeview(stats_tree_frame,yscrollcommand=stats_scroll.set,selectmode='browse')
+        stats_tree.pack()
+        # define columns 
+        stats_tree['columns'] = ('planter', 'total', 'avg', 'pb', 'stdev')
+        stats_tree.column("#0", width=0, stretch=tk.NO)
+        stats_tree.column("planter", anchor=tk.W, width=100)
+        stats_tree.column("total",anchor=tk.CENTER, width=100)
+        stats_tree.column("avg", anchor=tk.CENTER, width=100)
+        stats_tree.column("pb", anchor=tk.CENTER, width=100)
+        stats_tree.column("stdev", anchor=tk.CENTER, width=100)
+        # define headings 
+        stats_tree.heading("#0", text="", anchor=tk.W)
+        stats_tree.heading("planter", text="Planter", anchor=tk.W)
+        stats_tree.heading("total", text="Total", anchor=tk.CENTER)
+        stats_tree.heading("avg", text="Average", anchor=tk.CENTER)
+        stats_tree.heading("pb", text="P. B.", anchor=tk.CENTER)
+        stats_tree.heading("stdev", text="STDEV", anchor=tk.CENTER)
+        stats_tree.tag_configure('even', background='#313131')
+        stats_tree.tag_configure('odd', background='#424242')
+        # insert each row 
+        x = 0
+        for row in rows:
+            if x%2: 
+                TAG = 'even'
+            else: 
+                TAG = 'odd'
+            stats_tree.insert(parent='', index='end', iid=[x]+row, text='', values=(row),tags=(TAG,) )
+            x+=1
+        stats_tree_frame.update()
+    stats_btn_frame = ttk.Frame(stats_page) 
+    stats_btn_frame.pack()
+
+    # buttons and labels 
+    stats_report_btn = ttk.Button(stats_btn_frame, text='Generate Report', command=generate_stats, style='Accent.TButton')
+    stats_report_btn.pack()
 
 
     #foreman report page
     f_page = ttk.Frame(r_book)
     r_book.add(f_page, text="Foreman")
 
+    global f_tree_frame 
+    f_tree_frame = ttk.Frame(f_page)
+    f_tree_frame.pack()
+    global f_scroll
+    f_scroll = ttk.Scrollbar(f_tree_frame)
+    f_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    # build tree
+    global f_tree
+    f_tree = ttk.Treeview(f_tree_frame,yscrollcommand=f_scroll.set,selectmode='browse')
+    f_tree.pack()
+    def generate_foreman():
+        global f_tree
+        global f_tree_frame
+        global f_btn_frame
+        # gather data and assign to variables 
+        
+        foreman_data = c.foreman_report()
+        rows = foreman_data[0]
+        total, crew_total, cmsn_total, gross_total = foreman_data[1]
 
+        # reset the tree
+        f_tree.destroy()
+        f_tree_frame.update()
+        f_tree = ttk.Treeview(f_tree_frame,yscrollcommand=f_scroll.set,selectmode='browse')
+        f_tree.pack()
+        # define columns 
+        f_tree['columns'] = ('Date', 'Planted', 'Crew', 'Gross') # Date Planted Crew Planted Gross
+        f_tree.column("#0", width=0, stretch=tk.NO)
+        f_tree.column("Date", anchor=tk.W, width=100)
+        f_tree.column("Planted",anchor=tk.CENTER, width=100)
+        f_tree.column("Crew", anchor=tk.CENTER, width=100)
+        f_tree.column("Gross", anchor=tk.CENTER, width=100)
+        # define headings 
+        f_tree.heading("#0", text="", anchor=tk.W)
+        f_tree.heading("Date", text="Date", anchor=tk.W)
+        f_tree.heading("Planted", text="Planted", anchor=tk.CENTER)
+        f_tree.heading("Crew", text="Crew Planted", anchor=tk.CENTER)
+        f_tree.heading("Gross", text="Gross", anchor=tk.CENTER)
 
+        f_tree.tag_configure('even', background='#313131')
+        f_tree.tag_configure('odd', background='#424242')
+        # insert each row 
+        x = 0
+        for row in rows[1:]:
+            row[-1] = f'${row[-1]}'
+            if x%2: 
+                TAG = 'even'
+            else: 
+                TAG = 'odd'
+            f_tree.insert(parent='', index='end', iid=row, text='', values=(row),tags=(TAG,) )
+            x+=1
+        f_tree_frame.update()
+        # labels for misc data 
+        total_label = ttk.Label(f_btn_frame, text=f'Total Planted: {total}')
+        crew_label = ttk.Label(f_btn_frame, text=f'Crew Total: {crew_total}')
+        cmsn_label = ttk.Label(f_btn_frame, text=f'Commission: ${cmsn_total}')
+        gross_label = ttk.Label(f_btn_frame, text=f'Gross: ${gross_total}')
+        total_label.grid(row=1,column=0,padx=5)
+        crew_label.grid(row=1,column=1,padx=5, pady=10)
+        cmsn_label.grid(row=2,column=0,padx=5)
+        gross_label.grid(row=2,column=1,padx=5)
+
+    # frame to hold button and labels 
+    global f_btn_frame
+    f_btn_frame = ttk.Frame(f_page)
+    f_btn_frame.pack()
+    # button to generate reports 
+    foreman_report_btn = ttk.Button(f_btn_frame, text="Generate Report", command=generate_foreman, style='Accent.TButton')
+    foreman_report_btn.grid(row=0,column=0, columnspan=2, pady=(10,0))
 
     r_book.pack(expand=True, fill="both", padx=5, pady=5)
     
@@ -323,7 +467,7 @@ class App():
             TAG = 'even'
         else:
             TAG = 'odd'
-        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname,c.new_pid()),tags=(TAG,))
+        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname),tags=(TAG,))
         p_count += 1
     
     def remove_planter():
@@ -469,9 +613,9 @@ class App():
         values = { 
         'code':s_code.get(),
         'species':s_spec.get(),
-        'price':s_price.get(),
-        'box_size':s_box.get(),
-        'bndl_size':s_bndl.get()
+        'price':float(s_price.get()),
+        'box_size':int(s_box.get()),
+        'bndl_size':int(s_bndl.get())
         }
 
         if (values['box_size'] % values['bndl_size']): 
@@ -491,9 +635,9 @@ class App():
 
         code = s_code.get()
         spec = s_spec.get() 
-        price = s_price.get() 
-        box = s_box.get() 
-        bndl = s_bndl.get()
+        price = float(s_price.get()) 
+        box = int(s_box.get()) 
+        bndl = int(s_bndl.get())
         if (c.seed_code_exists(code) or (box%bndl)):
             return
             # error message here!!! 
@@ -506,7 +650,7 @@ class App():
             TAG = 'even'
         else:
             TAG = 'odd'
-        s_tree.insert(parent='', index='end', iid=s_count, text='', values=(code, spec, '$' + price, box, bndl),tags=(TAG,))
+        s_tree.insert(parent='', index='end', iid=s_count, text='', values=(code, spec, '$' + str(price), box, bndl),tags=(TAG,))
         s_count += 1
 
 
@@ -688,7 +832,96 @@ class App():
     block_rem_btn.grid(row=0,column=2,padx=5)
     
     # end of day Frame 
+    global eod_proper
+    eod_proper = ttk.Frame(endofday) 
+    eod_proper.pack() 
+    def eod(): 
+        global eod_proper
+        global block_select
+        global day_entry
+        for widgets in eod_proper.winfo_children():
+            widgets.destroy()
+        eod_proper.update()
 
+        # ensure valid date entered 
+        try: 
+            datetime.datetime.strptime(day_entry.get(), '%Y-%m-%d')
+        except: 
+            day_entry.delete(0,tk.END)
+            day_entry.insert(0,'MUST BE YYYY-MM-DD')
+            return
+        # empty list to fill with (pid, sid, N*<ttk.Entry>)
+        entries = []    
+        # build planter list 
+        planters = c.get('planters') # (oid, fname, lname)
+        # build seed list
+        seeds = c.get_blocks()[block_select.get()]
+        # create HEADER 
+        header = ["Planter"]
+        for seed in seeds: 
+            header += [seed, "Boxes", "Bundles"]
+        # build end of day
+        j = 0 
+        i = 0 
+        for heading in header: 
+            h = ttk.Label(eod_proper, text=heading) 
+            h.grid(row=j, column=i,padx=5,pady=10)
+            i+=1
+        j += 1
+
+        for planter in planters: 
+            p = ttk.Label(eod_proper, text=planter[1])
+            p.grid(row=j, column=0,pady=(0,10))
+            i=1
+            for seed in seeds: 
+                s = ttk.Label(eod_proper, text=seed)
+                s.grid(row=j, column=i, padx=5,pady=(0,10))
+                box = ttk.Spinbox(eod_proper, width=10, from_=0, to=50)
+                bndl = ttk.Spinbox(eod_proper, width=10, from_=-50, to=50)
+                box.set(0)
+                bndl.set(0)
+                box.grid(row=j, column=i+1,padx=5,pady=(0,10))
+                bndl.grid(row=j, column=i+2,padx=5,pady=(0,10))
+                # add the "temp" entries to the list 
+                entries.append([planter[0], seed, box, bndl])
+                i+=3
+            j+=1
+
+        # submit button
+        def submit_eod():
+            for entry in entries: 
+                print(entry)
+            response = messagebox.askyesno("Confirmation", "Do you want to commit this data?")
+            if response == 0:
+                return
+            else:
+                for entry in entries: 
+                    print(entry[2].get(), entry[3].get())
+                    data = [day_entry.get(), entry[0], entry[1], int(entry[2].get()), int(entry[3].get())]
+                    print(data)
+                    c.add('daily', data)
+
+
+        submit_eod_btn = ttk.Button(eod_proper, text='Submit', command=submit_eod, style='Accent.TButton')
+        submit_eod_btn.grid(row=j, column=0, columnspan=100)
+
+    # frame = endofday
+    eod_btn_frame = ttk.Frame(endofday)
+    eod_btn_frame.pack()
+    # build list of blocks and create a drop down 
+    block_list = [ b for b in c.get_blocks().keys()]
+    global block_select
+    block_select = tk.StringVar()
+    # build day entry widget 
+    global day_entry 
+    day_entry = ttk.Entry(eod_btn_frame)
+    day_entry.insert(0,datetime.datetime.now().strftime('%Y-%m-%d'))
+    day_entry.grid(row=0, column=1, padx=10, pady=10)
+
+    block_menu = ttk.OptionMenu(eod_btn_frame, block_select, block_list[0], *block_list)
+    block_menu.grid(row=0, column=0, padx=10)
+    start_eod_btn = ttk.Button(eod_btn_frame, text='Start EOD', command= eod, style='Accent.TButton')
+    start_eod_btn.grid(row=0, column=2,padx=10)
     # grid the frames to root 
     reports.grid(row=0, column=0,padx=5,pady=5)
     dataview.grid(row=0, column=1,padx=5,pady=5)

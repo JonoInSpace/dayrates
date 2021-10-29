@@ -44,7 +44,16 @@ class Connector():
     def __init__(self, db):
         self.conn = sqlite3.connect(db)
         self.c = self.conn.cursor()
-        
+    
+    def new(self): 
+        # RETURNS TRUE IF ALL TABLES ARE EMPTY 
+        for table in ['planters', 'seedlots', 'blocks', 'daily']: 
+            self.c.execute(f'SELECT * FROM {table}')
+            if (self.c.fetchall()): 
+                return False
+        return True
+
+
     def get(self, table):
         self.c.execute(f"SELECT oid, * from {table}")
         return self.c.fetchall()
@@ -141,6 +150,21 @@ class Connector():
         self.c.execute(f"SELECT oid,lname FROM planters")
         return [str(planter[0]) + " " + planter[1] for planter in self.c.fetchall()]
     
+    def dummy(self): 
+        # inserts one dummy row to each table
+        try:
+            self.add('planters',['fname','lname'])
+        except:
+            pass
+        try:
+            self.add('seedlots',['seed1','species',0,0,0])
+        except:
+            pass
+        try:
+            self.add('blocks', ['block1', 'code'])
+        except:
+            pass
+        
     def daily_report(self, day, foreman=False):
         """
         if foreman==False:
@@ -159,7 +183,7 @@ class Connector():
         planter_list = []
         for pid in pid_list:
             self.c.execute(f"SELECT lname FROM planters WHERE oid ={pid}")
-            planter_list.append(self.c.fetchall()[0][0])
+            planter_list.append((pid,self.c.fetchall()[0][0]))
         header = ["Planter"]
         for sid in sid_list:
             header.append(sid)
@@ -168,13 +192,13 @@ class Connector():
         commission = 0
         crew_total = 0
         for planter in planter_list:
-            row = [planter]
+            row = [planter[1]]
             planter_total = 0
             planter_gross = 0
             for sid in sid_list:
                 self.c.execute(f"SELECT price FROM seedlots WHERE code = '{sid}'")
                 seed_price = self.c.fetchall()[0][0]
-                self.c.execute(f"SELECT {TOTAL} FROM daily JOIN seedlots ON sid = seedlots.code WHERE jour = '{day}' AND sid='{sid}'")
+                self.c.execute(f"SELECT {TOTAL} FROM daily JOIN seedlots ON sid = seedlots.code WHERE jour = '{day}' AND sid='{sid}' AND pid = '{planter[0]}'")
                 seed_total = self.c.fetchall()[0][0]
                 row.append(seed_total)
                 planter_total += seed_total
@@ -204,7 +228,7 @@ class Connector():
         Always returns this tuple:
         (average, best,    std_dev)
         """
-        self.c.execute(f"SELECT DISTINCT jour FROM daily WHERE pid = {pid}")
+        self.c.execute(f"SELECT DISTINCT jour FROM daily WHERE pid = {pid} ORDER BY jour ASC")
         day_list = [day[0] for day in self.c.fetchall()]
         rows = []
         total = 0
@@ -243,25 +267,27 @@ class Connector():
 """
         self.c.execute("SELECT oid, lname FROM planters")
         planter_list = [pid for pid in self.c.fetchall()]
-        rows = [['Planter', 'Total', 'Average', 'Best', 'STDEV']]
+        rows=[]
         for planter in planter_list:
             stats = self.planter_report(planter[0], stats=True)
             rows.append([planter[1], stats[0], stats[1], stats[2], stats[3]])
+        rows.sort(key=lambda x: x[1], reverse=True)
+        
         return rows
     
     def foreman_report(self):
         """
         returns a list of rows:
-        ['Date',    'Planted',  'Crew Planted', 'Gross'],
+        [['Date',    'Planted',  'Crew Planted', 'Gross'],
         [day1,      planted1,   crew_planted1,  gross1],
         ...
-        [dayM,      plantedM,   crew_plantedM,  grossM]
+        [dayM,      plantedM,   crew_plantedM,  grossM]]
         
         and a tuple:
         (total, crew_total, cmsn_total, gross_total)
         """
         rows = [['Date', 'Planted', 'Crew Planted', 'Gross']]
-        self.c.execute('SELECT DISTINCT jour FROM daily')
+        self.c.execute('SELECT DISTINCT jour FROM daily ORDER BY jour ASC')
         day_list = [day[0] for day in self.c.fetchall()]
         total = 0
         crew_total = 0
@@ -280,24 +306,10 @@ class Connector():
                 daily_grossed += entry[1]
             total += daily_planted
             gross_total += daily_grossed
-            rows.append([day, daily_planted, crew_planted, daily_grossed + commission])
-        return rows, (total, crew_total, cmsn_total, gross_total)
+            rows.append([day, daily_planted, crew_planted, round(daily_grossed + commission,2)])
+        return rows, (total, crew_total, cmsn_total, round(gross_total,2))
 
 
 # testing stuff
 if __name__ == '__main__':
-    c = Connector('dayrates.db')
-#     print(c.daily_report('2021-10-15'), '\n')
-#     print(c.planter_report(1), '\n')
-#     print(c.stats_report(), '\n')
-#     print(c.foreman_report())
-   # print(c.in_daily('pid', '1'))
-    #print(c.in_daily('pid', 'foo'))
-    
- #   print(c.get_blocks())
- #   c.delete_on('blocks', 'block3')
- #   print(c.get_blocks())
-#    days=['2021-10-13', '2021-10-14','2021-10-15']
- #   for day in days: 
-#        print(c.daily_report(day))
-    print(c.planter_list())
+    build_database()
