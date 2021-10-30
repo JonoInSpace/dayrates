@@ -111,7 +111,7 @@ class Connector():
         self.conn.commit() 
         return self.c.fetchall()[0][0]
         
-    def update_on(self, table, oid, values):
+    def update_on(self, table, key, values, keyword='oid'):
         # values here is a dictionary,
         # for example with the planters table:
         # { 'fname':'John', 'lname':'Doe' }
@@ -121,7 +121,7 @@ class Connector():
         sql = f"UPDATE {table} SET "
         for value_name, value in values.items():
             sql += f"{value_name} = '{value}',"
-        sql = sql[0:-1] + f" WHERE oid = {oid}"
+        sql = sql[0:-1] + f" WHERE {keyword} = '{key}'"
         self.c.execute(sql)
         self.conn.commit()
     
@@ -269,7 +269,10 @@ class Connector():
         planter_list = [pid for pid in self.c.fetchall()]
         rows=[]
         for planter in planter_list:
-            stats = self.planter_report(planter[0], stats=True)
+            try:
+                stats = self.planter_report(planter[0], stats=True)
+            except Exception as e: 
+                stats=[0,0,0,0]
             rows.append([planter[1], stats[0], stats[1], stats[2], stats[3]])
         rows.sort(key=lambda x: x[1], reverse=True)
         
@@ -307,7 +310,7 @@ class Connector():
             total += daily_planted
             gross_total += daily_grossed
             rows.append([day, daily_planted, crew_planted, round(daily_grossed + commission,2)])
-        return rows, (total, crew_total, cmsn_total, round(gross_total,2))
+        return rows, (total, crew_total, cmsn_total, round(gross_total+cmsn_total,2))
 
 
 # testing stuff

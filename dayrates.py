@@ -50,6 +50,7 @@ class App():
     # OptionMenu to select the day, defaulted to latest entry 
     global day
     day = tk.StringVar()
+    global day_list
     day_list = c.day_list()
     if not day_list:
         day_list.append(datetime.datetime.now().strftime('%Y-%m-%d'))
@@ -63,8 +64,19 @@ class App():
     global day_tree
     day_tree = ttk.Treeview(day_tree_frame,yscrollcommand=day_scroll.set,selectmode='browse')
 
+    def reset_day(): 
+        global day_tree
+        selected = day.get()
+        response = messagebox.askyesno("Confirmation", f"Are you sure you wish to delete all data for {selected}?")
+        if response: 
+            c.delete_on('daily', selected, keyword='jour')
+            day_tree.destroy() 
+        else: 
+            return
+
     def generate_daily():
         global day
+        global day_select 
         # grab the data 
         daily_data = c.daily_report(day.get())
         # display in a treeview with scroller
@@ -129,11 +141,13 @@ class App():
     global day_label_frame
     day_label_frame =ttk.Frame(daily_page)
     day_label_frame.pack()
-
+    global day_select
     day_select = ttk.OptionMenu(day_btn_frame, day, day_list[0], *day_list)
     day_select.grid(row=0, column=0,padx=10)
     gen_day_btn = ttk.Button(day_btn_frame, text='Generate Report', command=generate_daily, style='Accent.TButton')
     gen_day_btn.grid(row=0, column=1, padx=10,pady=10)
+    del_day_btn = ttk.Button(day_btn_frame, text='Reset Selected Day',command=reset_day, style='Accent.TButton')
+    del_day_btn.grid(row=0, column=2, pady=10, padx=10)
 
     # planter reports page
     pr_page = ttk.Frame(r_book)
@@ -161,7 +175,13 @@ class App():
         global pr_tree_frame
         # gather data and assign to variables 
         pid = planter.get().split()[0]
-        planter_data = c.planter_report(pid)
+        try:
+            planter_data = c.planter_report(pid)
+        except: 
+            pr_tree.destroy() 
+            pr_tree_frame.update()
+            response = messagebox.showerror('Error', 'Planter not associated with any data yet!') 
+            return
         rows = planter_data[0]
         total, gross = planter_data[1]
         avg,pb,stdev = planter_data[2]
@@ -370,16 +390,8 @@ class App():
 
     r_book.pack(expand=True, fill="both", padx=5, pady=5)
     
-
-
-    # data management Frame
-    # NEEDS ERROR MESSAGING
-    # 
-    # 
-    # 
     dv_book = ttk.Notebook(dataview)
-    
-    
+
     # # planter view page # #
     ps_page = ttk.Frame(dv_book)
     dv_book.add(ps_page, text="Planters")
@@ -446,7 +458,7 @@ class App():
     p_fname.grid(row=0,column=1,columnspan=3)
     p_lname.grid(row=1,column=1,columnspan=3)
     p_id.grid(row=2,column=1,columnspan=3,pady=(0,5))
-    
+    p_id.config(state='disabled')
     # edit and add buttons
     
     def edit_planter():
@@ -467,16 +479,14 @@ class App():
             TAG = 'even'
         else:
             TAG = 'odd'
-        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname),tags=(TAG,))
+        p_tree.insert(parent='', index='end', iid=p_count, text='', values=(fname,lname,p_count+1),tags=(TAG,))
         p_count += 1
     
     def remove_planter():
         oid = p_id.get()
         if (c.in_daily('pid', oid)): 
+            response = messagebox.showerror("Error", "Cannot remove planter: associated with daily entries")
             return 
-            # error message here 
-            # 
-            # 
 
         c.delete_on('planters', oid, keyword='oid')
         p_tree.delete(p_tree.focus())
@@ -560,21 +570,22 @@ class App():
     # labels and entries for seedlot info 
     s_code_label = ttk.Label(s_data_frame, text='Code')
     s_spec_label = ttk.Label(s_data_frame, text='Species')
-    s_price_label = ttk.Label(s_data_frame, text='Price')
     s_box_label = ttk.Label(s_data_frame, text='Box Size')
     s_bndl_label = ttk.Label(s_data_frame, text='Bndl Size')
+    s_price_label = ttk.Label(s_data_frame, text='Price')
     
     global s_code
     global s_spec
     global s_price
     global s_box
     global s_bndl
-
+    global seed_code
+    seed_code = ''
     s_code = ttk.Entry(s_data_frame,width=10)
     s_spec = ttk.Entry(s_data_frame,width=10)
-    s_price = ttk.Entry(s_data_frame,width=10)
     s_box = ttk.Entry(s_data_frame,width=10)
     s_bndl = ttk.Entry(s_data_frame,width=10)
+    s_price = ttk.Entry(s_data_frame,width=10)
 
     s_code_label.grid(row=0,column=0)
     s_spec_label.grid(row=0,column=2)
@@ -589,6 +600,9 @@ class App():
     s_bndl.grid(row=1,column=3)
 
     def select_seedlot(x):
+        global seed_code
+        seed_code = s_code.get()
+
         s_code.delete(0,tk.END)
         s_spec.delete(0,tk.END)
         s_price.delete(0,tk.END)
@@ -599,6 +613,8 @@ class App():
         values = s_tree.item(selected, 'values')
 
         s_code.insert(0,values[0])
+        seed_code = s_code.get()
+
         s_spec.insert(0,values[1])
         s_price.insert(0,values[2][1:])
         s_box.insert(0,values[3])
@@ -617,16 +633,17 @@ class App():
         'box_size':int(s_box.get()),
         'bndl_size':int(s_bndl.get())
         }
+        if values['code'] != seed_code: 
+            response = messagebox.askyesno("Warning!", "Seed code has been changed! If this code is already being used, data could be corrupted. Do you want to continue?")
+            if not response: 
+                return
 
         if (values['box_size'] % values['bndl_size']): 
            return 
-           #  error message here!!!
-           # 
-           # 
-           # 
+           response = messagebox.showerror("Error", "Box size must be a multiple of bundle size!")
 
-        oid = c.get_seed_oid(values['code'])
-        c.update_on('seedlots', oid, values)
+        
+        c.update_on('seedlots', seed_code, values, keyword='code')
         selected = s_tree.focus()
         s_tree.item(selected, text='', values=(values['code'],values['species'],'$' + str(values['price']),values['box_size'],values['bndl_size']))
 
@@ -638,12 +655,13 @@ class App():
         price = float(s_price.get()) 
         box = int(s_box.get()) 
         bndl = int(s_bndl.get())
-        if (c.seed_code_exists(code) or (box%bndl)):
+
+        if (c.seed_code_exists(code)):
+            response = messagebox.showerror("Error", "Seed code already exists!")
             return
-            # error message here!!! 
-            # 
-            # 
-            # 
+        if not (box%bndl): 
+            response = messagebox.showerror("Error", "Box size must be a multiple of Bundle size!")
+             
 
         c.add('seedlots', [code, spec, price, box, bndl])
         if s_count % 2:
@@ -657,10 +675,9 @@ class App():
     def remove_seed(): 
         code = s_code.get() 
         if c.in_daily('sid', code):
+            response = messagebox.showerror("Error", "Cannot remove seed: associated with daily entries!")
             return
-            # error message
-            # 
-            #
+            
 
         c.delete_on('seedlots', code)
         s_tree.delete(s_tree.focus())
@@ -777,11 +794,8 @@ class App():
 
         block, seed = (block_entry.get(), bs_entry.get())
         if not block: 
+            response = messagebox.showerror("Error", "No block code given, cannot commit to database")
             return
-            # error message here!!
-            # 
-            # 
-
         # add parent BLOCK if not already present
         if not block_tree.exists(block): 
             fix = 'e'*(bb_count%2) + 'o'*(not bb_count%2)
@@ -790,17 +804,13 @@ class App():
 
         if seed: # there is a selected seed
             if not c.seed_code_exists(seed): 
+                response = messagebox.showwarning("Warning", "Invalid seed code!")
                 return
-                # error message here!!
-                # 
-                # 
 
             if block in c.get_blocks():
-                if seed in c.get_blocks()[block]:
-                    return 
-                # error message here!! 
-                # 
-                # 
+                if seed in c.get_blocks()[block]: 
+                    response = messagebox.showwarning("Warning", "Selected block already contains selected seed")
+                    return
 
             # add entry to database
             c.add('blocks', [block, seed])
@@ -889,16 +899,23 @@ class App():
 
         # submit button
         def submit_eod():
-            for entry in entries: 
-                print(entry)
+            global day_list
+            global day_select
+            global day_btn_frame 
             response = messagebox.askyesno("Confirmation", "Do you want to commit this data?")
             if response == 0:
                 return
             else:
+                print(day_list) 
+                day_list.append(day_entry.get())
+                day_list.sort(reverse=True)
+                day_select.destroy()
+                day_select = ttk.OptionMenu(day_btn_frame, day, day_list[0], *day_list)
+                day_select.grid(row=0, column=0,padx=10)
+                print(day_list)
+
                 for entry in entries: 
-                    print(entry[2].get(), entry[3].get())
                     data = [day_entry.get(), entry[0], entry[1], int(entry[2].get()), int(entry[3].get())]
-                    print(data)
                     c.add('daily', data)
 
 
@@ -930,5 +947,6 @@ class App():
 
     dv_book.pack(expand=True, fill='both', padx=5, pady=5)
     root.mainloop()
+    
 if __name__ == '__main__':
     App()
