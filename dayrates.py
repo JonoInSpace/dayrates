@@ -66,11 +66,15 @@ class App():
 
     def reset_day(): 
         global day_tree
+        global day_list
         selected = day.get()
         response = messagebox.askyesno("Confirmation", f"Are you sure you wish to delete all data for {selected}?")
         if response: 
             c.delete_on('daily', selected, keyword='jour')
             day_tree.destroy() 
+            day_list = c.day_list()
+            print(day_list)
+            day_list.remove(day)
         else: 
             return
 
@@ -849,10 +853,13 @@ class App():
         global eod_proper
         global block_select
         global day_entry
+        global block_menu
         for widgets in eod_proper.winfo_children():
             widgets.destroy()
         eod_proper.update()
-
+        # make block_select, day_entry DISABLED
+        block_menu.config(state='disabled')
+        day_entry.config(state='disabled')
         # ensure valid date entered 
         try: 
             datetime.datetime.strptime(day_entry.get(), '%Y-%m-%d')
@@ -861,8 +868,11 @@ class App():
             day_entry.insert(0,'MUST BE YYYY-MM-DD')
             return
         # empty list to fill with (pid, sid, N*<ttk.Entry>)
-        entries = []    
-        # build planter list 
+        entries = []
+        # empty list to hold running totals for each planter, to be updated with the update_total() function by the spinboxes
+        
+        # build planter list                
+
         planters = c.get('planters') # (oid, fname, lname)
         # build seed list
         seeds = c.get_blocks()[block_select.get()]
@@ -870,6 +880,7 @@ class App():
         header = ["Planter"]
         for seed in seeds: 
             header += [seed, "Boxes", "Bundles"]
+        header += ['Total']
         # build end of day
         j = 0 
         i = 0 
@@ -879,26 +890,44 @@ class App():
             i+=1
         j += 1
 
-        for planter in planters: 
+        def update(label, row): 
+            t = 0
+            total = label
+            for entry in entries: 
+                if entry[0] == row: 
+                    # add to running total
+                    seed_data = c.get_on('seedlots', entry[1], 'code')[-2:]
+                    t += int(entry[2].get()) * seed_data[0] + int(entry[3].get()) * seed_data[1]
+            total.delete(0,tk.END)
+            total.insert(0, t)
+
+
+        for planter in planters:
             p = ttk.Label(eod_proper, text=planter[1])
             p.grid(row=j, column=0,pady=(0,10))
+            total = ttk.Entry(eod_proper, justify=tk.RIGHT,width=15) 
+            total.insert(0,0)
             i=1
-            for seed in seeds: 
+            for seed in seeds:
                 s = ttk.Label(eod_proper, text=seed)
                 s.grid(row=j, column=i, padx=5,pady=(0,10))
-                box = ttk.Spinbox(eod_proper, width=10, from_=0, to=50)
-                bndl = ttk.Spinbox(eod_proper, width=10, from_=-50, to=50)
+                box_size, bndl_size = c.get_on('seedlots', seed, keyword='code')[-2:]
+                box = ttk.Spinbox(eod_proper, width=10, from_=0, to=50, command=lambda x=total, y=planter[0] : update(x,y))
+                bndl = ttk.Spinbox(eod_proper, width=10, from_=-50, to=50, command=lambda x=total, y=planter[0] : update(x,y))
                 box.set(0)
                 bndl.set(0)
                 box.grid(row=j, column=i+1,padx=5,pady=(0,10))
                 bndl.grid(row=j, column=i+2,padx=5,pady=(0,10))
-                # add the "temp" entries to the list 
-                entries.append([planter[0], seed, box, bndl])
+                # add the "temporary" entries to the list 
+                entries.append([planter[0], seed, box, bndl, total])
                 i+=3
+            total.grid(row=j, column=i,padx=5,pady=(0,10))
             j+=1
 
         # submit button
         def submit_eod():
+            # destroy eod_proper
+
             global day_list
             global day_select
             global day_btn_frame 
@@ -906,18 +935,24 @@ class App():
             if response == 0:
                 return
             else:
-                print(day_list) 
+                
+                global block_menu
+                global day_entry
+                block_menu.config(state='enabled')
+                day_entry.config(state='enabled')
+
                 day_list.append(day_entry.get())
                 day_list.sort(reverse=True)
                 day_select.destroy()
                 day_select = ttk.OptionMenu(day_btn_frame, day, day_list[0], *day_list)
                 day_select.grid(row=0, column=0,padx=10)
-                print(day_list)
 
                 for entry in entries: 
                     data = [day_entry.get(), entry[0], entry[1], int(entry[2].get()), int(entry[3].get())]
                     c.add('daily', data)
-
+                for widget in eod_proper.winfo_children():
+                    widget.destroy() 
+                eod_proper.update() 
 
         submit_eod_btn = ttk.Button(eod_proper, text='Submit', command=submit_eod, style='Accent.TButton')
         submit_eod_btn.grid(row=j, column=0, columnspan=100)
@@ -934,7 +969,7 @@ class App():
     day_entry = ttk.Entry(eod_btn_frame)
     day_entry.insert(0,datetime.datetime.now().strftime('%Y-%m-%d'))
     day_entry.grid(row=0, column=1, padx=10, pady=10)
-
+    global block_menu   
     block_menu = ttk.OptionMenu(eod_btn_frame, block_select, block_list[0], *block_list)
     block_menu.grid(row=0, column=0, padx=10)
     start_eod_btn = ttk.Button(eod_btn_frame, text='Start EOD', command= eod, style='Accent.TButton')

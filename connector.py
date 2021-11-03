@@ -78,8 +78,8 @@ class Connector():
             block_and_seeds[block] = seed_list
         return block_and_seeds
 
-    def get_on(self, table, oid):
-        self.c.execute(f"SELECT * from {table} WHERE oid = {oid}")
+    def get_on(self, table, key, keyword='oid'):
+        self.c.execute(f"SELECT * from {table} WHERE {keyword} = '{key}'")
         return self.c.fetchall()[0]
 
     def get_seed_oid(self, code): 
